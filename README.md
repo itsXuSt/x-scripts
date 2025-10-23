@@ -36,7 +36,7 @@
 
 - 📦 一键将 AppImage 添加到应用启动器
 - 🖱️ 支持文件管理器右键菜单快速安装
-- 🖼️ 自动利用文件管理器生成的缩略图作为应用图标
+- 🖼️ 智能图标提取：优先从 AppImage 内部提取，降级使用缩略图或默认图标
 - 🎯 自动创建桌面快捷方式
 - 🔄 智能检测重复安装
 - 🗑️ 完善的卸载功能，支持批量清理
@@ -44,7 +44,7 @@
 
 #### 📥 快速开始
 
-**安装工具（普通用户）：**
+**安装工具（普通用户，如果安装后重启文管仍不显示入口，请卸载再进行系统级安装）：**
 ```bash
 cd 00.add-appimage-to-launcher
 ./install.sh
@@ -91,6 +91,9 @@ cd 00.add-appimage-to-launcher
 ├── bin/
 │   └── install-appimage.sh              # 安装脚本
 ├── appimages/                            # AppImage 存放目录
+│   ├── .icons/                           # 应用图标目录
+│   │   ├── App1.png
+│   │   └── App2.png
 │   ├── App1.AppImage
 │   └── App2.AppImage
 └── share/
@@ -107,12 +110,21 @@ cd 00.add-appimage-to-launcher
 
 1. **检查文件**：验证 AppImage 文件是否存在和有效
 2. **移动文件**：将 AppImage 移动到 `~/.local/appimages/` 目录
-3. **提取图标**：利用 Deepin 文件管理器的缩略图算法计算图标路径
-   ```bash
-   FILE_URL="file://<appimage-path>"
-   THUMB_MD5=$(echo -n "$FILE_URL" | md5sum)
-   ICON_PATH="$HOME/.cache/thumbnails/large/${THUMB_MD5}.png"
-   ```
+3. **智能提取图标**（三层降级策略）：
+   - **方案1（优先）**：从 AppImage 内部解压提取 PNG 图标
+     ```bash
+     # 使用 --appimage-extract 解压
+     # 查找所有 PNG 文件，选择文件大小最大的（高分辨率）
+     # 拷贝到 ~/.local/appimages/.icons/${APPNAME}.png
+     ```
+   - **方案2（降级）**：如果解压失败，尝试使用文件管理器缩略图
+     ```bash
+     FILE_URL="file://<appimage-path>"
+     THUMB_MD5=$(echo -n "$FILE_URL" | md5sum)
+     ICON_PATH="$HOME/.cache/thumbnails/large/${THUMB_MD5}.png"
+     # 如果缩略图存在，拷贝到图标目录
+     ```
+   - **方案3（兜底）**：使用系统默认图标 `application-x-executable`
 4. **创建 Desktop 文件**：在 `~/.local/share/applications/` 创建启动器条目
 5. **创建桌面快捷方式**：软链接到桌面目录
 6. **更新数据库**：刷新应用启动器索引
@@ -132,19 +144,20 @@ cd 00.add-appimage-to-launcher
 <details>
 <summary><b>Q: 安装后应用图标显示不正确？</b></summary>
 
-**A:** 可能的原因：
-1. 文件管理器还未生成缩略图 - 脚本会等待 2 秒，但可能不够（建议等 appimage 文件已有缩略图之后再操作）
-2. AppImage 文件本身不包含图标
-3. 解决方法：可以手动编辑 `~/.local/share/applications/<app>.desktop` 文件，修改 `Icon=` 字段
+**A:** 新版本采用三层降级策略，图标问题已大幅改善：
+1. **优先方案**：直接从 AppImage 内部提取原始图标（最可靠）
+2. **降级方案**：使用文件管理器已生成的缩略图
+3. **兜底方案**：使用系统默认图标
+4. 如仍有问题，可手动编辑 `~/.local/share/applications/<app>.desktop` 文件中的 `Icon=` 字段
 </details>
 
 <details>
 <summary><b>Q: 可以在其他 Linux 发行版上使用吗？</b></summary>
 
-**A:** 目前不支持。本工具依赖于 Deepin/UOS 特有的：
-- 文件管理器右键菜单配置路径
-- 缩略图生成算法
-- 如需支持其他发行版，需要适配相应的配置路径和机制
+**A:** 新版本兼容性提升：
+- ✅ **图标提取**：已改为通用方案，支持所有支持 AppImage 的发行版
+- ⚠️ **右键菜单**：仍依赖 Deepin/UOS 文件管理器的配置路径
+- 💡 **建议**：其他发行版可直接使用命令行方式安装 AppImage
 </details>
 
 <details>
@@ -167,7 +180,10 @@ rm ~/Desktop/<app-name>.desktop
 # 3. 删除 AppImage 文件
 rm ~/.local/appimages/<app-name>.AppImage
 
-# 4. 更新数据库
+# 4. 删除图标文件（可选）
+rm ~/.local/appimages/.icons/<app-name>.png
+
+# 5. 更新数据库
 update-desktop-database ~/.local/share/applications
 ```
 </details>
@@ -176,10 +192,12 @@ update-desktop-database ~/.local/share/applications
 
 - **开发语言**：Bash Shell
 - **依赖工具**：
-  - `md5sum` - 计算缩略图路径
+  - `find` - 查找 PNG 图标文件
+  - `md5sum` - 计算缩略图路径（降级方案）
   - `notify-send` - 发送桌面通知
   - `update-desktop-database` - 更新应用数据库
-- **兼容性**：Deepin 20/23, UOS v20
+  - AppImage 自带的 `--appimage-extract` 功能
+- **兼容性**：Deepin 20/23/25, UOS v20（图标提取功能支持所有 Linux 发行版）
 
 ---
 
