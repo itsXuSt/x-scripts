@@ -51,7 +51,19 @@ APPIMAGE_DIR="$HOME/appimages"
 APPLICATIONS_DIR="$HOME/.local/share/applications"
 DESKTOP_DIR="$HOME/Desktop"
 
+# 检查文件是否已经在安装目录中
+APPIMAGE_DIR_REAL="$(realpath "$APPIMAGE_DIR" 2>/dev/null || echo "$APPIMAGE_DIR")"
+APPIMAGE_FILE_DIR="$(dirname "$APPIMAGE_FILE")"
+
+if [ "$APPIMAGE_FILE_DIR" = "$APPIMAGE_DIR_REAL" ]; then
+    echo -e "${YELLOW}文件已位于安装目录中，无需移动${NC}"
+#    send_notification "AppImage 已在安装目录" "$FILENAME 已经位于 $APPIMAGE_DIR 中" "normal"
+    exit 0
+fi
+
 echo "开始安装 AppImage: $FILENAME"
+
+sleep 2 # 延时两秒等文管创建缩略图
 
 # 1. 创建 appimages 目录
 if [ ! -d "$APPIMAGE_DIR" ]; then
@@ -75,7 +87,28 @@ chmod +x "$TARGET_FILE" || error_exit "无法设置文件可执行权限"
 
 echo -e "${GREEN}文件已移动并设置可执行权限${NC}"
 
-# 3. 创建 .desktop 文件
+# 3. 查找图标（根据文管缩略图算法）
+echo "构造应用图标路径..."
+
+# 构造缩略图路径：直接利用文管生成的缩略图
+# 1. path = url.toString(QUrl::FullyEncoded)
+FILE_URL="file://${APPIMAGE_FILE}"
+
+# 2. thumbPath = path.toMd5().toHex() + ".png"
+if command -v md5sum &> /dev/null; then
+    THUMB_MD5=$(echo -n "$FILE_URL" | md5sum | cut -d' ' -f1)
+    THUMB_PATH="${THUMB_MD5}.png"
+
+    # 3. fullThumbPath = $HOME/.cache/thumbnails/large/$thumbPath
+    ICON_PATH="$HOME/.cache/thumbnails/large/${THUMB_PATH}"
+    echo -e "${GREEN}图标路径: $ICON_PATH${NC}"
+else
+    # 没有 md5sum 命令，使用默认图标
+    ICON_PATH="application-x-executable"
+    echo -e "${YELLOW}未找到 md5sum 命令，使用默认图标${NC}"
+fi
+
+# 4. 创建 .desktop 文件
 echo "创建桌面入口文件..."
 
 # 确保 applications 目录存在
@@ -88,7 +121,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Exec=$TARGET_FILE
 GenericName=$APPNAME
-Icon=application-x-executable
+Icon=$ICON_PATH
 Name=$APPNAME
 Terminal=false
 Type=Application
