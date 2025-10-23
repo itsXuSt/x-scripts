@@ -47,7 +47,7 @@ FILENAME="$(basename "$APPIMAGE_FILE")"
 APPNAME="${FILENAME%.*}"  # 去掉扩展名作为应用名
 
 # 定义目标目录
-APPIMAGE_DIR="$HOME/appimages"
+APPIMAGE_DIR="$HOME/.local/appimages"
 APPLICATIONS_DIR="$HOME/.local/share/applications"
 DESKTOP_DIR="$HOME/Desktop"
 
@@ -63,13 +63,15 @@ fi
 
 echo "开始安装 AppImage: $FILENAME"
 
-sleep 2 # 延时两秒等文管创建缩略图
-
 # 1. 创建 appimages 目录
 if [ ! -d "$APPIMAGE_DIR" ]; then
     echo "创建目录: $APPIMAGE_DIR"
     mkdir -p "$APPIMAGE_DIR" || error_exit "无法创建目录 $APPIMAGE_DIR"
 fi
+
+chmod +x "$APPIMAGE_FILE" || error_exit "无法设置文件可执行权限"
+
+sleep 2 # 延时两秒等文管创建缩略图
 
 # 2. 检查目标文件是否已存在
 TARGET_FILE="$APPIMAGE_DIR/$FILENAME"
@@ -164,7 +166,7 @@ else
 fi
 
 # 4. 发送成功通知
-send_notification "AppImage 安装成功" "$APPNAME 已安装完成！\n可以从应用菜单或桌面快捷方式启动" "normal"
+send_notification "AppImage 已添加到启动器" "$APPNAME 可以从应用菜单或桌面快捷方式启动" "normal"
 
 echo -e "\n${GREEN}========================================${NC}"
 echo -e "${GREEN}安装完成！${NC}"
