@@ -20,13 +20,25 @@ echo "开始安装 AppImage 管理工具..."
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 定义源文件和目标路径
+# 定义源文件
 SOURCE_SCRIPT="$SCRIPT_DIR/install-appimage.sh"
-TARGET_BIN_DIR="$HOME/.local/bin"
-TARGET_SCRIPT="$TARGET_BIN_DIR/install-appimage.sh"
 
-CONF_DIR="$HOME/.local/share/deepin/dde-file-manager/context-menus"
-TARGET_CONF="$CONF_DIR/00.install-appimage.conf"
+# 根据是否以 root 权限运行来决定安装路径
+if [ "$EUID" -eq 0 ]; then
+    # 以 root 权限运行（sudo 执行）
+    echo -e "${YELLOW}检测到以 root 权限运行，将安装到系统目录${NC}"
+    TARGET_BIN_DIR="/usr/local/bin"
+    TARGET_SCRIPT="$TARGET_BIN_DIR/install-appimage.sh"
+    CONF_DIR="/etc/deepin/context-menus"
+    TARGET_CONF="$CONF_DIR/00.install-appimage.conf"
+else
+    # 普通用户运行
+    echo -e "${YELLOW}以普通用户权限运行，将安装到用户目录${NC}"
+    TARGET_BIN_DIR="$HOME/.local/bin"
+    TARGET_SCRIPT="$TARGET_BIN_DIR/install-appimage.sh"
+    CONF_DIR="$HOME/.local/share/deepin/dde-file-manager/context-menus"
+    TARGET_CONF="$CONF_DIR/00.install-appimage.conf"
+fi
 
 # 检查源脚本是否存在
 if [ ! -f "$SOURCE_SCRIPT" ]; then
@@ -82,15 +94,17 @@ fi
 
 echo -e "${GREEN}✓ 配置文件已创建: $TARGET_CONF${NC}"
 
-# 检查 ~/.local/bin 是否在 PATH 中
-if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
-    echo ""
-    echo -e "${YELLOW}注意: $TARGET_BIN_DIR 不在 PATH 环境变量中${NC}"
-    echo "建议将以下内容添加到 ~/.bashrc 或 ~/.zshrc 中："
-    echo ""
-    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
-    echo ""
-    echo "然后执行: source ~/.bashrc (或 source ~/.zshrc)"
+# 检查 PATH（仅针对用户目录安装）
+if [ "$EUID" -ne 0 ]; then
+    if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
+        echo ""
+        echo -e "${YELLOW}注意: $TARGET_BIN_DIR 不在 PATH 环境变量中${NC}"
+        echo "建议将以下内容添加到 ~/.bashrc 或 ~/.zshrc 中："
+        echo ""
+        echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo ""
+        echo "然后执行: source ~/.bashrc (或 source ~/.zshrc)"
+    fi
 fi
 
 # 完成
